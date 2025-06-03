@@ -8,6 +8,8 @@ Modern, type-safe, and async-ready Python SDK for AI agent observability and tra
 pip install voltagent
 ```
 
+### Context Manager Usage (Recommended)
+
 ```python
 import asyncio
 from voltagent import VoltAgentSDK
@@ -21,7 +23,7 @@ async def main():
         flush_interval=5
     )
 
-    # Start a trace (conversation/session)
+    # Start a trace (conversation/session) with automatic resource management
     async with sdk.trace(
         agentId="customer-support-v1",
         input={"query": "How to reset my password?"},
@@ -30,7 +32,7 @@ async def main():
         tags=["support", "password-reset"]
     ) as trace:
 
-        # Add an agent
+        # Add an agent with automatic completion
         async with trace.add_agent({
             "name": "Support Agent",
             "input": {"task": "Handle password reset request"},
@@ -53,14 +55,123 @@ async def main():
                 }
             )
 
-            # Complete the workflow
+            # Complete the workflow - agent auto-completes when exiting context
             await agent.success(
                 output={"response": "Password reset link sent!"},
                 usage={"prompt_tokens": 150, "completion_tokens": 85, "total_tokens": 235}
             )
 
+        # Trace auto-completes when exiting context
+
 asyncio.run(main())
 ```
+
+### Manual Usage (For Advanced Control)
+
+```python
+import asyncio
+from voltagent import VoltAgentSDK, TraceStatus
+
+async def manual_example():
+    sdk = VoltAgentSDK(
+        base_url="https://api.voltagent.dev",
+        public_key="your-public-key",
+        secret_key="your-secret-key"
+    )
+
+    trace = None
+    agent = None
+
+    try:
+        # Manually create trace
+        trace = await sdk.create_trace(
+            agentId="customer-support-v1",
+            input={"query": "How to reset my password?"},
+            userId="user-123",
+            conversationId="conv-456",
+            tags=["support", "password-reset"]
+        )
+
+        # Manually add agent
+        agent = await trace.add_agent({
+            "name": "Support Agent",
+            "input": {"task": "Handle password reset request"},
+            "instructions": "You are a helpful customer support agent.",
+            "metadata": {
+                "model_parameters": {"model": "gpt-4"}
+            }
+        })
+
+        # Use a tool
+        tool = await agent.add_tool({
+            "name": "knowledge-base-search",
+            "input": {"query": "password reset procedure"}
+        })
+
+        await tool.success(
+            output={
+                "results": ["Reset via email", "Reset via SMS"],
+                "relevance_score": 0.89
+            }
+        )
+
+        # Manually complete agent
+        await agent.success(
+            output={"response": "Password reset link sent!"},
+            usage={"prompt_tokens": 150, "completion_tokens": 85, "total_tokens": 235}
+        )
+
+        # Manually end trace
+        await trace.end(
+            output={"support_completed": True},
+            status=TraceStatus.COMPLETED
+        )
+
+    except Exception as e:
+        # Manual error handling
+        if agent:
+            await agent.error(status_message=f"Agent failed: {e}")
+        if trace:
+            await trace.end(status=TraceStatus.ERROR, metadata={"error": str(e)})
+    finally:
+        await sdk.shutdown()
+
+asyncio.run(manual_example())
+```
+
+## 🎯 Usage Patterns: When to Use Which Approach
+
+### Context Manager Usage (Recommended for Most Cases)
+
+**Best for:**
+- ✅ Simple workflows and standard use cases
+- ✅ Automatic resource cleanup and error handling
+- ✅ Cleaner, more Pythonic code
+- ✅ Built-in exception handling and trace completion
+- ✅ Reduced boilerplate code
+
+**Example scenarios:**
+- Standard chat bot interactions
+- Simple data processing workflows
+- API integrations with straightforward error handling
+- Most production applications
+
+### Manual Usage (For Advanced Control)
+
+**Best for:**
+- ✅ Long-running processes that need checkpoints
+- ✅ Complex error handling and recovery scenarios
+- ✅ Custom resource management requirements
+- ✅ Integration with existing error handling systems
+- ✅ Batch processing with progress tracking
+- ✅ When you need granular control over trace lifecycle
+
+**Example scenarios:**
+- Data pipeline processing with checkpoints
+- Multi-stage workflows with custom retry logic
+- Integration with enterprise error handling systems
+- Real-time streaming applications
+- Background job processing
 
 ## 📋 Features
 
@@ -496,7 +607,7 @@ await retriever.error(
 
 ## 🔧 Usage Examples
 
-### Simple Weather Agent
+### Simple Weather Agent (Context Manager)
 
 ```python
 import asyncio
@@ -556,7 +667,88 @@ async def weather_example():
 asyncio.run(weather_example())
 ```
 
-### Multi-Agent Research Workflow
+### Simple Weather Agent (Manual Control)
+
+```python
+import asyncio
+from voltagent import VoltAgentSDK, TraceStatus
+
+async def manual_weather_example():
+    sdk = VoltAgentSDK(
+        base_url="https://api.voltagent.dev",
+        public_key="your-public-key",
+        secret_key="your-secret-key"
+    )
+
+    trace = None
+    agent = None
+
+    try:
+        # Manually create trace
+        trace = await sdk.create_trace(
+            agentId="weather-agent-manual",
+            input={"query": "Weather in Istanbul?"},
+            tags=["weather", "manual"]
+        )
+
+        # Manually add agent
+        agent = await trace.add_agent({
+            "name": "Weather Agent Manual",
+            "instructions": "You provide accurate weather information.",
+            "metadata": {"model_parameters": {"model": "gpt-4"}}
+        })
+
+        # Call weather API
+        weather_tool = await agent.add_tool({
+            "name": "weather_api",
+            "input": {"city": "Istanbul"}
+        })
+
+        await weather_tool.success(
+            output={
+                "temperature": 22,
+                "condition": "sunny",
+                "humidity": 65
+            }
+        )
+
+        # Save to memory
+        memory = await agent.add_memory({
+            "name": "cache_weather",
+            "input": {
+                "key": "istanbul_weather",
+                "value": {"temp": 22, "condition": "sunny"}
+            }
+        })
+
+        await memory.success(
+            output={"cached": True, "expires_in": 3600}
+        )
+
+        # Manually complete agent
+        await agent.success(
+            output={"response": "It's 22°C and sunny in Istanbul!"},
+            usage={"prompt_tokens": 50, "completion_tokens": 25, "total_tokens": 75}
+        )
+
+        # Manually end trace
+        await trace.end(
+            output={"weather_provided": True, "city": "Istanbul"},
+            status=TraceStatus.COMPLETED
+        )
+
+    except Exception as e:
+        if agent:
+            await agent.error(status_message=f"Weather agent failed: {e}")
+        if trace:
+            await trace.end(status=TraceStatus.ERROR, metadata={"error": str(e)})
+    finally:
+        await sdk.shutdown()
+
+asyncio.run(manual_weather_example())
+```
+
+### Multi-Agent Research Workflow (Context Manager)
 
 ```python
 async def research_workflow():
@@ -631,6 +823,118 @@ async def research_workflow():
             )
 
 asyncio.run(research_workflow())
+```
+
+### Multi-Agent Research Workflow (Manual Control)
+
+```python
+async def manual_research_workflow():
+    sdk = VoltAgentSDK(
+        base_url="https://api.voltagent.dev",
+        public_key="your-public-key",
+        secret_key="your-secret-key"
+    )
+
+    trace = None
+    researcher = None
+    summarizer = None
+    translator = None
+
+    try:
+        # Manually create trace
+        trace = await sdk.create_trace(
+            agentId="research-orchestrator-manual",
+            input={"topic": "AI trends 2024"},
+            tags=["research", "ai-trends", "manual"]
+        )
+
+        # Manually create research agent
+        researcher = await trace.add_agent({
+            "name": "Research Agent Manual",
+            "instructions": "You research and gather information on given topics.",
+            "metadata": {"model_parameters": {"model": "gpt-4"}}
+        })
+
+        search = await researcher.add_retriever({
+            "name": "web_search",
+            "input": {"query": "AI trends 2024", "max_results": 10}
+        })
+
+        await search.success(
+            output={
+                "documents": ["AI trend doc 1", "AI trend doc 2"],
+                "relevance_scores": [0.9, 0.8],
+                "total_results": 10
+            }
+        )
+
+        # Manually complete research agent
+        await researcher.success(
+            output={"research_complete": True, "documents_found": 10},
+            usage={"prompt_tokens": 200, "completion_tokens": 150, "total_tokens": 350}
+        )
+
+        # Manually create summary agent
+        summarizer = await trace.add_agent({
+            "name": "Summary Agent Manual",
+            "instructions": "You create comprehensive summaries from research data.",
+            "metadata": {"model_parameters": {"model": "gpt-4"}}
+        })
+
+        # Manually create translation sub-agent
+        translator = await summarizer.add_agent({
+            "name": "Translation Agent Manual",
+            "instructions": "You translate content to different languages.",
+            "metadata": {"model_parameters": {"model": "gpt-3.5-turbo"}}
+        })
+
+        translate_tool = await translator.add_tool({
+            "name": "translate_api",
+            "input": {"text": "AI trends summary", "target_language": "tr"}
+        })
+
+        await translate_tool.success(
+            output={"translated_text": "AI eğilimleri özeti..."}
+        )
+
+        # Manually complete translation agent
+        await translator.success(
+            output={"translation": "Turkish translation completed"},
+            usage={"prompt_tokens": 100, "completion_tokens": 80, "total_tokens": 180}
+        )
+
+        # Manually complete summary agent
+        await summarizer.success(
+            output={"summary": "Comprehensive AI trends summary with translation"},
+            usage={"prompt_tokens": 300, "completion_tokens": 200, "total_tokens": 500}
+        )
+
+        # Manually end trace
+        await trace.end(
+            output={
+                "research_completed": True,
+                "agents_used": 3,
+                "total_documents": 10,
+                "translation_completed": True
+            },
+            status=TraceStatus.COMPLETED,
+            usage={"prompt_tokens": 600, "completion_tokens": 430, "total_tokens": 1030}
+        )
+
+    except Exception as e:
+        # Manual cascade error handling
+        if translator:
+            await translator.error(status_message=f"Translation failed: {e}")
+        if summarizer:
+            await summarizer.error(status_message=f"Summary failed: {e}")
+        if researcher:
+            await researcher.error(status_message=f"Research failed: {e}")
+        if trace:
+            await trace.end(status=TraceStatus.ERROR, metadata={"error": str(e)})
+    finally:
+        await sdk.shutdown()
+
+asyncio.run(manual_research_workflow())
 ```
 
 ### Error Handling
@@ -718,18 +1022,122 @@ asyncio.run(error_handling_example())
 
 ## 💡 Best Practices
 
-1. **Always use context managers** (`async with`) for automatic resource cleanup
-2. **Use meaningful names** for traces, agents, tools, and operations to improve debugging
-3. **Include relevant metadata** for debugging and analytics, but avoid sensitive data
-4. **Track token usage** in the `usage` parameter for proper cost tracking
-5. **Handle errors properly** with descriptive error messages and relevant context
-6. **Use hierarchical agents** for complex workflows to maintain clear operation flow
-7. **Set appropriate tags** on traces for easy filtering and search in the dashboard
-8. **Use structured error objects** instead of plain strings for better error analysis
-9. **Include timing metadata** for performance monitoring and optimization
-10. **Group related operations** under the same agent for logical organization
-11. **Use snake_case in Python** - the SDK automatically converts to camelCase for the API
-12. **Call `await sdk.shutdown()`** before your application exits to ensure all events are sent
+### General Guidelines
+
+1. **Use meaningful names** for traces, agents, tools, and operations to improve debugging
+2. **Include relevant metadata** for debugging and analytics, but avoid sensitive data
+3. **Track token usage** in the `usage` parameter for proper cost tracking
+4. **Handle errors properly** with descriptive error messages and relevant context
+5. **Use hierarchical agents** for complex workflows to maintain clear operation flow
+6. **Set appropriate tags** on traces for easy filtering and search in the dashboard
+7. **Use structured error objects** instead of plain strings for better error analysis
+8. **Include timing metadata** for performance monitoring and optimization
+9. **Group related operations** under the same agent for logical organization
+10. **Use snake_case in Python** - the SDK automatically converts to camelCase for the API
+11. **Call `await sdk.shutdown()`** before your application exits to ensure all events are sent
+
+### Context Manager Best Practices
+
+**When to use:** Most standard workflows, simple error handling needs, cleaner code preferred
+
+- ✅ **Always prefer context managers** (`async with`) for automatic resource cleanup
+- ✅ **Rely on automatic error handling** - context managers handle exceptions gracefully
+- ✅ **Nest context managers** for hierarchical workflows
+- ✅ **Let automatic completion handle success states** when exiting contexts
+
+```python
+# Good: Clean context manager usage
+async with sdk.trace(agentId="my-agent") as trace:
+    async with trace.add_agent({"name": "Worker"}) as agent:
+        tool = await agent.add_tool({"name": "api-call"})
+        await tool.success(output={"result": "done"})
+        # Agent and trace automatically complete
+```
+
+### Manual Usage Best Practices
+
+**When to use:** Long-running processes, complex error handling, custom resource management
+
+- ✅ **Always use try/except/finally blocks** for proper error handling
+- ✅ **Manually complete all resources** (traces, agents) in correct order
+- ✅ **Handle cascade failures** - if a sub-agent fails, handle parent agent failures
+- ✅ **Use progress tracking** for long-running processes
+- ✅ **Implement custom retry logic** when needed
+- ✅ **Save checkpoints** for resumable operations
+
+```python
+# Good: Proper manual resource management
+trace = None
+agent = None
+try:
+    trace = await sdk.create_trace(agentId="long-process")
+    agent = await trace.add_agent({"name": "Processor"})
+
+    # Process with checkpoints
+    for step in range(total_steps):
+        await process_step(step)
+        await trace.update(metadata={"progress": step/total_steps})
+
+    await agent.success(output={"completed": True})
+    await trace.end(status=TraceStatus.COMPLETED)
+
+except Exception as e:
+    if agent:
+        await agent.error(status_message=f"Failed: {e}")
+    if trace:
+        await trace.end(status=TraceStatus.ERROR)
+finally:
+    await sdk.shutdown()
+```
+
+### Error Handling Patterns
+
+**Context Manager Error Handling:**
+```python
+async with sdk.trace(agentId="error-prone") as trace:
+    async with trace.add_agent({"name": "Worker"}) as agent:
+        try:
+            # Risky operation
+            result = await risky_api_call()
+            await tool.success(output=result)
+        except Exception as e:
+            # Handle specific tool errors
+            await tool.error(status_message=e)
+            # Context manager will handle agent/trace errors automatically
+```
+
+**Manual Error Handling:**
+```python
+trace = None
+agent = None
+try:
+    trace = await sdk.create_trace(agentId="error-prone")
+    agent = await trace.add_agent({"name": "Worker"})
+
+    result = await risky_api_call()
+    await agent.success(output=result)
+    await trace.end(status=TraceStatus.COMPLETED)
+
+except Exception as e:
+    # Cascade error handling
+    if agent:
+        await agent.error(status_message=f"Agent failed: {e}")
+    if trace:
+        await trace.end(
+            status=TraceStatus.ERROR,
+            metadata={"error": str(e), "error_type": type(e).__name__}
+        )
+finally:
+    await sdk.shutdown()
+```
+
+### Performance Optimization
+
+- 🚀 **Enable auto-flush** for real-time event sending: `auto_flush=True`
+- 🚀 **Adjust flush intervals** based on your needs: `flush_interval=5`
+- 🚀 **Use appropriate timeout values** for your network conditions
+- 🚀 **Batch related operations** under the same agent for better grouping
+- 🚀 **Include performance metadata** (response times, memory usage) for monitoring
 
 ## 🧪 Testing & Development
 
@@ -750,7 +1158,12 @@ pytest --cov=voltagent --cov-report=html
 
 ```bash
 cd voltagent-python
+
+# Context manager examples (recommended for most users)
 python examples/comprehensive_trace_example.py
+
+# Manual usage examples (for advanced control scenarios)
+python examples/manual_usage_examples.py
 ```
 
 ### Code Quality

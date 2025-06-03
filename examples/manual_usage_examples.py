@@ -1,17 +1,17 @@
 """
-VoltAgent Python SDK - Comprehensive Trace and Agent Hierarchy Examples
+VoltAgent Python SDK - Manual Usage Examples
 
-This example demonstrates the SAME SCENARIOS as TypeScript SDK examples:
+This example demonstrates the SAME SCENARIOS as TypeScript SDK examples but using MANUAL resource management:
 - Basic trace and agent creation (Tokyo weather)
 - Multi-level agent hierarchies (Global AI research)
 - Tool, memory, and retriever operations
 - Error handling patterns
-- Context manager usage (Python-specific)
+- Manual resource management (no context managers)
 
 These examples match the TypeScript SDK scenarios exactly for consistent documentation.
 
 Run with:
-    python examples/comprehensive_trace_example.py
+    python examples/manual_usage_examples.py
 """
 
 import asyncio
@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 # Import VoltAgent SDK
-from voltagent import EventLevel, TokenUsage, VoltAgentSDK
+from voltagent import EventLevel, TokenUsage, TraceStatus, VoltAgentSDK
 
 # ===== SIMULATED EXTERNAL SERVICES =====
 
@@ -60,12 +60,12 @@ async def translate_text(text: str, target_lang: str) -> str:
 # ===== EXAMPLE FUNCTIONS =====
 
 
-async def basic_trace_example(sdk: VoltAgentSDK) -> None:
-    """Basic Trace and Agent Example - Matches TypeScript SDK exactly."""
-    print("\n🚀 Basic Trace and Agent Example Starting...")
+async def basic_trace_example_manual(sdk: VoltAgentSDK) -> None:
+    """Basic Trace and Agent Example - Manual approach matching TypeScript SDK exactly."""
+    print("\n🚀 Basic Trace and Agent Example Starting (Manual)...")
 
-    # Using async context manager - Python best practice!
-    async with sdk.trace(
+    # Create trace manually - no context manager
+    trace = await sdk.create_trace(
         agentId="weather-agent-v1",
         input={"query": "What's the weather in Tokyo?"},
         userId="user-123",
@@ -75,9 +75,10 @@ async def basic_trace_example(sdk: VoltAgentSDK) -> None:
             "source": "sdk-example",
             "version": "1.0",
         },
-    ) as trace:
-        print(f"✅ Trace created: {trace.id}")
+    )
+    print(f"✅ Trace created: {trace.id}")
 
+    try:
         # Add main agent
         agent = await trace.add_agent(
             {
@@ -132,6 +133,8 @@ async def basic_trace_example(sdk: VoltAgentSDK) -> None:
                 },
             )
             print(f"❌ Weather tool error: {error}")
+            # Manual cleanup on error
+            await trace.end(status=TraceStatus.ERROR, metadata={"error": str(error)})
             return
 
         # Add memory operation
@@ -179,15 +182,31 @@ async def basic_trace_example(sdk: VoltAgentSDK) -> None:
         )
         print("✅ Main agent completed")
 
-        # Trace will be automatically ended by context manager
-        print(f"🎉 Trace completed: {trace.id}")
+        # Manually end trace with success
+        await trace.end(
+            status=TraceStatus.COMPLETED,
+            output={
+                "final_response": "Weather in Tokyo is 24°C and rainy.",
+                "agent_count": 1,
+                "tool_count": 1,
+                "memory_operations": 1,
+            },
+            usage=TokenUsage(prompt_tokens=45, completion_tokens=25, total_tokens=70),
+        )
+        print(f"🎉 Trace completed manually: {trace.id}")
+
+    except Exception as error:
+        # Manual error handling
+        print(f"❌ Error in basic example: {error}")
+        await trace.end(status=TraceStatus.ERROR, metadata={"error": str(error)})
 
 
-async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
-    """Complex Multi-Agent Hierarchy Example - Matches TypeScript SDK exactly."""
-    print("\n🌟 Complex Multi-Agent Hierarchy Example Starting...")
+async def complex_hierarchy_example_manual(sdk: VoltAgentSDK) -> None:
+    """Complex Multi-Agent Hierarchy Example - Manual approach matching TypeScript SDK exactly."""
+    print("\n🌟 Complex Multi-Agent Hierarchy Example Starting (Manual)...")
 
-    async with sdk.trace(
+    # Create trace manually
+    trace = await sdk.create_trace(
         agentId="research-coordinator",
         input={
             "topic": "Global AI developments and emerging trends",
@@ -202,9 +221,10 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
             "deadline": "2024-06-01",
             "requester": "research-team",
         },
-    ) as trace:
-        print(f"✅ Research trace created: {trace.id}")
+    )
+    print(f"✅ Research trace created: {trace.id}")
 
+    try:
         # Main Coordinator Agent
         coordinator = await trace.add_agent(
             {
@@ -316,6 +336,14 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
                     "queryType": "comprehensive",
                 },
             )
+            # On tool failure, complete data collector with partial results
+            await data_collector.error(
+                status_message=error,
+                metadata={
+                    "failedTool": web_search_tool.id,
+                    "partialResults": True,
+                },
+            )
 
         # Add memory operation to data collector (store collected data)
         data_memory = await data_collector.add_memory(
@@ -399,7 +427,7 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
             },
         )
 
-        # Complete paper analyzer
+        # Manually complete paper analyzer
         await paper_analyzer.success(
             output={
                 "summary": "3 academic papers analyzed successfully",
@@ -527,7 +555,7 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
             },
         )
 
-        # Complete quality checker
+        # Manually complete quality checker
         await quality_checker.success(
             output={
                 "qualityScore": 0.94,
@@ -540,7 +568,7 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
             },
         )
 
-        # Complete translator
+        # Manually complete translator
         await translator.success(
             output={
                 "translationCompleted": True,
@@ -554,7 +582,7 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
             },
         )
 
-        # Complete data collector
+        # Manually complete data collector
         await data_collector.success(
             output={
                 "dataCollected": True,
@@ -601,7 +629,7 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
             },
         )
 
-        # Complete coordinator
+        # Manually complete coordinator
         await coordinator.success(
             output={
                 "projectCompleted": True,
@@ -622,56 +650,86 @@ async def complex_hierarchy_example(sdk: VoltAgentSDK) -> None:
         )
         print("👑 Coordinator agent completed")
 
-        # Trace will be automatically ended with success by context manager
-        print(f"🎉 Complex hierarchy trace completed: {trace.id}")
+        # Manually end trace with success
+        await trace.end(
+            status=TraceStatus.COMPLETED,
+            output={
+                "projectCompleted": True,
+                "totalAgents": 5,  # coordinator + data_collector + paper_analyzer + translator + quality_checker
+                "totalOperations": 8,
+                "summary": "Global AI research project completed successfully",
+            },
+            usage=TokenUsage(prompt_tokens=2217, completion_tokens=1335, total_tokens=3552),
+        )
+        print(f"🎉 Complex hierarchy trace completed manually: {trace.id}")
+
+    except Exception as error:
+        # Manual error handling
+        print(f"❌ Error in complex hierarchy example: {error}")
+        await trace.end(status=TraceStatus.ERROR, metadata={"error": str(error)})
 
 
-async def error_handling_example(sdk: VoltAgentSDK) -> None:
-    """Error Handling Example - Matches TypeScript SDK exactly."""
-    print("\n⚠️ Error Handling Example Starting...")
+async def error_handling_example_manual(sdk: VoltAgentSDK) -> None:
+    """Error Handling Example - Manual approach matching TypeScript SDK exactly."""
+    print("\n⚠️ Error Handling Example Starting (Manual)...")
+
+    # Create trace manually
+    trace = await sdk.create_trace(agentId="error-test-agent", input={"testType": "error-scenarios"})
 
     try:
-        async with sdk.trace(agentId="error-test-agent", input={"testType": "error-scenarios"}) as trace:
-            agent = await trace.add_agent({"name": "Error Test Agent", "input": {"scenario": "api-failure"}})
+        agent = await trace.add_agent({"name": "Error Test Agent", "input": {"scenario": "api-failure"}})
 
-            # Failed tool example
-            failing_tool = await agent.add_tool(
-                {"name": "failing-api-tool", "input": {"endpoint": "https://nonexistent-api.com/data"}}
-            )
+        # Failed tool example
+        failing_tool = await agent.add_tool(
+            {"name": "failing-api-tool", "input": {"endpoint": "https://nonexistent-api.com/data"}}
+        )
 
-            # Simulated API failure
-            await failing_tool.error(
-                status_message=Exception("API endpoint not reachable"),
-                metadata={
-                    "endpoint": "https://nonexistent-api.com/data",
-                    "httpStatus": 404,
-                },
-            )
-            print("❌ Tool error recorded")
+        # Simulated API failure
+        await failing_tool.error(
+            status_message=Exception("API endpoint not reachable"),
+            metadata={
+                "endpoint": "https://nonexistent-api.com/data",
+                "httpStatus": 404,
+            },
+        )
+        print("❌ Tool error recorded")
 
-            # Mark agent as failed as well
-            await agent.error(
-                status_message=Exception("Agent failed due to tool failure"),
-                metadata={
-                    "failedTool": failing_tool.id,
-                    "errorCategory": "api_failure",
-                },
-            )
-            print("❌ Agent error recorded")
+        # Mark agent as failed as well
+        await agent.error(
+            status_message=Exception("Agent failed due to tool failure"),
+            metadata={
+                "failedTool": failing_tool.id,
+                "errorCategory": "api_failure",
+            },
+        )
+        print("❌ Agent error recorded")
 
-            # Note: Trace will be automatically ended with error by context manager
-            print("❌ Trace terminated with error")
+        # Manually end trace with error status
+        await trace.end(
+            status=TraceStatus.ERROR,
+            metadata={
+                "errorType": "api_failure",
+                "failedAgent": agent.id,
+                "failedTool": failing_tool.id,
+            },
+        )
+        print("❌ Trace terminated with error manually")
 
-    except Exception as e:
-        print(f"❌ Error handling example error: {e}")
+    except Exception as error:
+        print(f"❌ Error in error handling example: {error}")
+        # Ensure trace is ended even on unexpected errors
+        await trace.end(status=TraceStatus.ERROR, metadata={"unexpectedError": str(error)})
 
 
 # ===== MAIN FUNCTION =====
 
 
 async def main() -> None:
-    """Main function demonstrating all SDK features - matches TypeScript examples."""
-    print("🌟 VoltAgent SDK - Comprehensive Trace and Agent Hierarchy Examples")
+    """Main function demonstrating manual SDK usage - matches TypeScript examples."""
+    print("🌟 VoltAgent SDK - Manual Usage Examples")
+    print("=" * 70)
+    print("📌 Note: This demonstrates the same scenarios as comprehensive_trace_example.py")
+    print("📌 but using MANUAL resource management instead of context managers")
     print("=" * 70)
 
     # Initialize SDK
@@ -685,12 +743,17 @@ async def main() -> None:
     )
 
     try:
-        # Run examples - matches TypeScript SDK order
-        await basic_trace_example(sdk)
-        await complex_hierarchy_example(sdk)
-        await error_handling_example(sdk)
+        # Run examples - matches TypeScript SDK order with manual approach
+        await basic_trace_example_manual(sdk)
+        await complex_hierarchy_example_manual(sdk)
+        await error_handling_example_manual(sdk)
 
-        print("\n✅ All examples completed!")
+        print("\n✅ All manual examples completed!")
+        print("📊 Key differences from context manager approach:")
+        print("   • Explicit trace.end() calls required")
+        print("   • Manual error handling and cleanup")
+        print("   • More granular control over resource lifecycle")
+        print("   • Better for long-running processes")
 
         # Final flush operation
         await sdk.flush()
@@ -708,7 +771,7 @@ async def main() -> None:
 
 if __name__ == "__main__":
     """
-    Run the examples - matches TypeScript SDK scenarios exactly.
+    Run the manual examples - matches TypeScript SDK scenarios exactly.
 
     Set environment variables:
     export VOLTAGENT_BASE_URL="https://api.voltagent.dev"
@@ -716,6 +779,6 @@ if __name__ == "__main__":
     export VOLTAGENT_SECRET_KEY="your-secret-key"
 
     Then run:
-    python examples/comprehensive_trace_example.py
+    python examples/manual_usage_examples.py
     """
     asyncio.run(main())
