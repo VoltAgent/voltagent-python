@@ -1018,14 +1018,6 @@ finally:
     await sdk.shutdown()
 ```
 
-### Performance Optimization
-
-- 🚀 **Enable auto-flush** for real-time event sending: `auto_flush=True`
-- 🚀 **Adjust flush intervals** based on your needs: `flush_interval=5`
-- 🚀 **Use appropriate timeout values** for your network conditions
-- 🚀 **Batch related operations** under the same agent for better grouping
-- 🚀 **Include performance metadata** (response times, memory usage) for monitoring
-
 ## 🧪 Testing & Development
 
 ### Running Tests
