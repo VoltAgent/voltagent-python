@@ -173,28 +173,6 @@ asyncio.run(manual_example())
 - Real-time streaming applications
 - Background job processing
 
-## 📋 Features
-
-✅ **Trace-based Architecture** - Industry standard observability patterns
-✅ **Async/Sync Support** - Native `asyncio` support with sync fallbacks
-✅ **Context Managers** - Pythonic resource management with `async with`
-✅ **Type Safety** - Full Pydantic validation and type hints
-✅ **Hierarchical Events** - Agent → Tool/Memory/Retriever relationships
-✅ **Multi-Agent Support** - Sub-agents and complex workflows
-✅ **Auto-flushing** - Automatic event batching and sending
-✅ **Error Handling** - Built-in error tracking and reporting
-✅ **Rich Metadata** - Snake_case to camelCase conversion
-
-## 🏗️ Architecture
-
-### Core Concepts
-
-- **Trace**: A complete conversation/session (the main execution context)
-- **Agent**: An AI agent operating within a trace
-- **Tool**: External service calls (APIs, databases, etc.)
-- **Memory**: Data storage and retrieval operations
-- **Retriever**: Information search and retrieval operations
-
 ### Event Hierarchy
 
 ```
@@ -209,19 +187,6 @@ Trace
     └── Retriever 1 → success/error
 ```
 
-## 📦 Installation
-
-### From PyPI (Recommended)
-```bash
-pip install voltagent
-```
-
-### From Source
-```bash
-git clone <repository-url>
-cd voltagent-python
-pip install -e .
-```
 
 ### Environment Variables
 
@@ -996,30 +961,6 @@ async def error_handling_example():
 asyncio.run(error_handling_example())
 ```
 
-## 🏷️ Event Types
-
-### Agent Events
-
-- `agent:start` - Agent begins processing
-- `agent:success` - Agent completes successfully
-- `agent:error` - Agent encounters an error
-
-### Tool Events
-
-- `tool:start` - Tool call begins
-- `tool:success` - Tool call succeeds
-- `tool:error` - Tool call fails
-
-### Memory Events
-
-- `memory:write_start` / `memory:write_success` / `memory:write_error`
-
-### Retriever Events
-
-- `retriever:start` - Retrieval begins
-- `retriever:success` - Retrieval succeeds
-- `retriever:error` - Retrieval fails
-
 ## 💡 Best Practices
 
 ### General Guidelines
@@ -1035,60 +976,6 @@ asyncio.run(error_handling_example())
 9. **Group related operations** under the same agent for logical organization
 10. **Use snake_case in Python** - the SDK automatically converts to camelCase for the API
 11. **Call `await sdk.shutdown()`** before your application exits to ensure all events are sent
-
-### Context Manager Best Practices
-
-**When to use:** Most standard workflows, simple error handling needs, cleaner code preferred
-
-- ✅ **Always prefer context managers** (`async with`) for automatic resource cleanup
-- ✅ **Rely on automatic error handling** - context managers handle exceptions gracefully
-- ✅ **Nest context managers** for hierarchical workflows
-- ✅ **Let automatic completion handle success states** when exiting contexts
-
-```python
-# Good: Clean context manager usage
-async with sdk.trace(agentId="my-agent") as trace:
-    async with trace.add_agent({"name": "Worker"}) as agent:
-        tool = await agent.add_tool({"name": "api-call"})
-        await tool.success(output={"result": "done"})
-        # Agent and trace automatically complete
-```
-
-### Manual Usage Best Practices
-
-**When to use:** Long-running processes, complex error handling, custom resource management
-
-- ✅ **Always use try/except/finally blocks** for proper error handling
-- ✅ **Manually complete all resources** (traces, agents) in correct order
-- ✅ **Handle cascade failures** - if a sub-agent fails, handle parent agent failures
-- ✅ **Use progress tracking** for long-running processes
-- ✅ **Implement custom retry logic** when needed
-- ✅ **Save checkpoints** for resumable operations
-
-```python
-# Good: Proper manual resource management
-trace = None
-agent = None
-try:
-    trace = await sdk.create_trace(agentId="long-process")
-    agent = await trace.add_agent({"name": "Processor"})
-
-    # Process with checkpoints
-    for step in range(total_steps):
-        await process_step(step)
-        await trace.update(metadata={"progress": step/total_steps})
-
-    await agent.success(output={"completed": True})
-    await trace.end(status=TraceStatus.COMPLETED)
-
-except Exception as e:
-    if agent:
-        await agent.error(status_message=f"Failed: {e}")
-    if trace:
-        await trace.end(status=TraceStatus.ERROR)
-finally:
-    await sdk.shutdown()
-```
 
 ### Error Handling Patterns
 
@@ -1211,17 +1098,7 @@ voltagent-python/
 - [VoltAgent Platform](https://voltagent.dev)
 - [Console Dashboard](https://console.voltagent.dev)
 - [Documentation](https://docs.voltagent.dev)
-- [TypeScript SDK](../sdk/)
-- [API Reference](https://docs.voltagent.dev/api)
 
 ## 📄 License
 
 MIT License - see LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-- 📧 Create an issue on GitHub
-- 💬 Join our Discord community
-- 📖 Check documentation at [docs.voltagent.dev](https://docs.voltagent.dev)
-- 🌐 Visit [voltagent.dev](https://voltagent.dev) for more information
